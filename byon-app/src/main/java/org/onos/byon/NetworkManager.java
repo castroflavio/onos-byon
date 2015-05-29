@@ -23,43 +23,99 @@ import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
-import org.onosproject.event.AbstractListenerRegistry;
-import org.onosproject.event.EventDeliveryService;
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
-import org.onosproject.net.intent.IntentEvent;
-import org.onosproject.net.intent.IntentListener;
 import org.onosproject.net.intent.IntentService;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Skeletal ONOS application component.
  */
+@Service
 @Component(immediate = true)
-public class NetworkManager {
+public class NetworkManager implements NetworkService {
 
     private static Logger log = LoggerFactory.getLogger(NetworkManager.class);
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected CoreService coreService;
+
+    private ApplicationId appId;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected SimpleNetworkStore store;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected IntentService intentService;
+
     @Activate
     protected void activate() {
-
         log.info("Started");
+        appId = coreService.registerApplication("org.onos.byon");
     }
 
     @Deactivate
     protected void deactivate() {
-
         log.info("Stopped");
     }
 
+    @Override
+    public void createNetwork(String network) {
+        store.putNetwork(network);
+    }
 
+    @Override
+    public void deleteNetwork(String network) {
+        store.removeNetwork(network);
+        store.removeIntents(network);
+    }
+
+    @Override
+    public Set<String> getNetworks() {
+        return store.getNetworks();
+    }
+
+    @Override
+    public void addHost(String network, HostId hostId) {
+        Set<HostId> hosts=store.addHost(network, hostId);//what if network doesn`t exist, should I fail silently
+        Set<Intent> intents= addToMesh(hostId,hosts);
+        store.addIntents(network,intents);
+    }
+
+    @Override
+    public void removeHost(String network, HostId hostId) {
+        Set<Intent> forRemoval=store.removeIntents(network,hostId);
+        store.removeHost(network,hostId);
+        removeFromMesh(forRemoval);
+    }
+
+    @Override
+    public Set<HostId> getHosts(String network) {
+        return store.getHosts(network);
+    }
+
+    private Set<Intent> addToMesh(HostId src, Set<HostId> existing) {
+        if (existing.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<Intent> submitted = new HashSet<>();
+        existing.forEach(dst -> {
+            if (!src.equals(dst)) {
+                Intent intent = new HostToHostIntent(appId, src, dst);
+                submitted.add(intent);
+                intentService.submit(intent);
+            }
+        });
+        return submitted;
+    }
+
+    private void removeFromMesh(Set<Intent> intents) {
+        intents.forEach(i -> intentService.withdraw(i));
+    }
 }
