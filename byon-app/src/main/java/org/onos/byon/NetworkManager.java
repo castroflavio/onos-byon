@@ -49,7 +49,7 @@ public class NetworkManager implements NetworkService {
     private ApplicationId appId;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected SimpleNetworkStore store;
+    protected NetworkStore store;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected IntentService intentService;
@@ -107,7 +107,8 @@ public class NetworkManager implements NetworkService {
         Set<Intent> submitted = new HashSet<>();
         existing.forEach(dst -> {
             if (!src.equals(dst)) {
-                Intent intent = new HostToHostIntent(appId, src, dst);
+                //Intent intent = new HostToHostIntent(appId, src, dst);
+                Intent intent = HostToHostIntent.builder().appId(appId).one(src).two(dst).build();
                 submitted.add(intent);
                 intentService.submit(intent);
             }
