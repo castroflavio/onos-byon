@@ -1,0 +1,6 @@
+package org.onos.byon;
+
+import org.onos.byon.NetworkEvent;
+import org.onosproject.event.EventListener;
+
+public interface NetworkListener extends EventListener<NetworkEvent> {}
