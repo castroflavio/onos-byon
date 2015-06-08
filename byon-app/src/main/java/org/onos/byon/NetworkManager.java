@@ -23,6 +23,8 @@ import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
+import org.onosproject.event.AbstractListenerRegistry;
+import org.onosproject.event.EventDeliveryService;
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
@@ -45,7 +47,6 @@ public class NetworkManager implements NetworkService {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
-
     private ApplicationId appId;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
@@ -62,6 +63,7 @@ public class NetworkManager implements NetworkService {
 
     @Deactivate
     protected void deactivate() {
+
         log.info("Stopped");
     }
 
@@ -107,8 +109,8 @@ public class NetworkManager implements NetworkService {
         Set<Intent> submitted = new HashSet<>();
         existing.forEach(dst -> {
             if (!src.equals(dst)) {
-                //Intent intent = new HostToHostIntent(appId, src, dst);
-                Intent intent = HostToHostIntent.builder().appId(appId).one(src).two(dst).build();
+                Intent intent = new HostToHostIntent(appId, src, dst);
+                //Intent intent = HostToHostIntent.builder().appId(appId).one(src).two(dst).build();
                 submitted.add(intent);
                 intentService.submit(intent);
             }
@@ -118,5 +120,4 @@ public class NetworkManager implements NetworkService {
 
     private void removeFromMesh(Set<Intent> intents) {
         intents.forEach(i -> intentService.withdraw(i));
-    }
-}
+

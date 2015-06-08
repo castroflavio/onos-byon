@@ -8,6 +8,7 @@ import org.apache.felix.scr.annotations.Service;
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
+import org.onosproject.store.AbstractStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,13 +18,15 @@ import java.util.Set;
 
 @Component(immediate = true, enabled = true)
 @Service
-public class SimpleNetworkStore
+public class SimpleNetworkStore extends AbstractStore<NetworkEvent, NetworkStoreDelegate>
         implements NetworkStore {
 
     private static Logger log = LoggerFactory.getLogger(SimpleNetworkStore.class);
 
     private final Map<String, Set<HostId>> networks = Maps.newHashMap();
     private final Map<String, Set<Intent>> intentsPerNet = Maps.newHashMap();
+
+
 
     @Activate
     protected void activate() {
@@ -42,8 +45,9 @@ public class SimpleNetworkStore
      */
     @Override
     public void putNetwork(String network) {
-        networks.putIfAbsent(network,new HashSet<>());
         intentsPerNet.putIfAbsent(network, new HashSet<>());
+        if (networks.putIfAbsent(network,new HashSet<>())==null)
+            notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_ADDED, network));
     }
 
     /**
@@ -53,8 +57,10 @@ public class SimpleNetworkStore
      */
     @Override
     public void removeNetwork(String network) {
-        networks.remove(network);
+
         intentsPerNet.remove(network);
+        if ( networks.remove(network) != null)
+            notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_REMOVED, network));
     }
 
     /**
@@ -80,7 +86,8 @@ public class SimpleNetworkStore
         Set<HostId> hosts = networks.get(network);
         if (hosts==null) return new HashSet<>();//returns empty set if network doesn`t exist
         if (hosts.add(hostId)){
-            networks.put(network,hosts);
+            if (networks.put(network,hosts)!= null)
+                notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_UPDATED,network));
             return hosts;
         }else return new HashSet<>();
     }
@@ -94,7 +101,9 @@ public class SimpleNetworkStore
     @Override
     public void removeHost(String network, HostId hostId) {
         Set<HostId> hosts = networks.get(network);
-        if (hosts!=null) hosts.remove(hostId);
+        if (hosts!=null)
+            if (hosts.remove(hostId))
+                notifyDelegate(new NetworkEvent(NetworkEvent.Type.NETWORK_UPDATED,network));
     }
 
     /**
@@ -161,5 +170,20 @@ public class SimpleNetworkStore
         Set<Intent> Intents =intentsPerNet.get(network);
         intentsPerNet.put(network,new HashSet<>());//is this necessary?
         return Intents;
+    }
+
+    @Override
+    public void setDelegate(NetworkStoreDelegate networkStoreDelegate) {
+
+    }
+
+    @Override
+    public void unsetDelegate(NetworkStoreDelegate networkStoreDelegate) {
+
+    }
+
+    @Override
+    public boolean hasDelegate() {
+        return false;
     }
 }

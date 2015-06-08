@@ -2,13 +2,14 @@ package org.onos.byon;
 
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.Intent;
+import org.onosproject.store.Store;
 
 import java.util.Set;
 
 /**
  * Created by distributed on 5/28/15.
  */
-public interface NetworkStore {
+public interface NetworkStore extends Store<NetworkEvent, NetworkStoreDelegate> {
     /**
      * Create a named network.
      *
