@@ -17,7 +17,7 @@ import java.util.Set;
 
 import static org.apache.felix.scr.annotations.ReferenceCardinality.MANDATORY_UNARY;
 
-@Component(immediate = true, enabled = true)
+@Component(immediate = false, enabled = false)
 @Service
 public class DistributedNetworkStore extends AbstractStore<NetworkEvent, NetworkStoreDelegate>
         implements NetworkStore {
