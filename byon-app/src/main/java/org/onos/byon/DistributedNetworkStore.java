@@ -1,13 +1,14 @@
 package org.onos.byon;
 
 import com.google.common.collect.Maps;
-import org.apache.felix.scr.annotations.Activate;
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Deactivate;
-import org.apache.felix.scr.annotations.Service;
+import org.apache.felix.scr.annotations.*;
+import org.onlab.util.KryoNamespace;
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
+import org.onosproject.store.service.ConsistentMap;
+import org.onosproject.store.service.Serializer;
+import org.onosproject.store.service.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,20 +16,55 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-@Component(immediate = false, enabled = false)
+
+import static org.apache.felix.scr.annotations.ReferenceCardinality.MANDATORY_UNARY;
+
+@Component(immediate = true, enabled = true)
 @Service
-public class SimpleNetworkStore
+public class DistributedNetworkStore
         implements NetworkStore {
 
-    private static Logger log = LoggerFactory.getLogger(SimpleNetworkStore.class);
+    private static Logger log = LoggerFactory.getLogger(DistributedNetworkStore.class);
 
-    private final Map<String, Set<HostId>> networks = Maps.newHashMap();
-    private final Map<String, Set<Intent>> intentsPerNet = Maps.newHashMap();
+    @Reference(cardinality = MANDATORY_UNARY)//Doubt I`m not sure this should be here
+    protected StorageService storageService;
 
+    private ConsistentMap<String, Set<HostId>> networks;
+    private ConsistentMap<String, Set<Intent>> intentsPerNet;
+
+    private static final Serializer SERIALIZER = new Serializer() {
+
+        KryoNamespace kryo = new KryoNamespace.Builder()
+                .register(HashSet.class)
+                .build();
+
+        @Override
+        public <T> byte[] encode(T object) {
+            return kryo.serialize(object);
+        }
+
+        @Override
+        public <T> T decode(byte[] bytes) {
+            return kryo.deserialize(bytes);
+        }
+
+    };
+    //private String listenerId;
     @Activate
     protected void activate() {
+        networks=storageService.<String, Set<HostId>>consistentMapBuilder()
+                .withName("onos-byon-net")// Copied from onos appdb
+                .withSerializer(SERIALIZER)// why is a serializer needed?
+                .build();
+        intentsPerNet=storageService.<String, Set<Intent>>consistentMapBuilder()
+                .withName("onos-byon-intents")// Copied from onos appdb
+                .withSerializer(SERIALIZER)// why is a serializer needed?
+                .build();
+        //EntryListener<String,Set<HostId>> listener = new RemoteListener();
+        //listenerId = networks.
         log.info("Started");
     }
+
 
     @Deactivate
     protected void deactivate() {
@@ -77,7 +113,7 @@ public class SimpleNetworkStore
      */
     @Override
     public Set<HostId> addHost(String network, HostId hostId) {
-        Set<HostId> hosts = networks.get(network);
+        Set<HostId> hosts = (Set<HostId>) networks.get(network);
         if (hosts==null) return new HashSet<>();//returns empty set if network doesn`t exist
         if (hosts.add(hostId)){
             networks.put(network,hosts);
@@ -93,7 +129,7 @@ public class SimpleNetworkStore
      */
     @Override
     public void removeHost(String network, HostId hostId) {
-        Set<HostId> hosts = networks.get(network);
+        Set<HostId> hosts = (Set<HostId>) networks.get(network);
         if (hosts!=null) hosts.remove(hostId);
     }
 
@@ -105,7 +141,7 @@ public class SimpleNetworkStore
      */
     @Override
     public Set<HostId> getHosts(String network) {
-        Set<HostId> hosts=networks.get(network);
+        Set<HostId> hosts= (Set<HostId>) networks.get(network);
         return (hosts!=null) ? hosts: new HashSet<>();
     }
 
@@ -117,7 +153,7 @@ public class SimpleNetworkStore
      */
     @Override
     public void addIntents(String network, Set<Intent> intents) {
-        Set<Intent> Intents =intentsPerNet.get(network);
+        Set<Intent> Intents = (Set<Intent>) intentsPerNet.get(network);
         if (Intents==null) {
             Intents = new HashSet<>();//is it going to break if null?
         }
@@ -134,7 +170,7 @@ public class SimpleNetworkStore
      */
     @Override
     public Set<Intent> removeIntents(String network, HostId hostId) {
-        Set<Intent> Intents =intentsPerNet.get(network);
+        Set<Intent> Intents = (Set<Intent>) intentsPerNet.get(network);
         if (Intents==null) {
             return new HashSet<>();
         }
@@ -158,7 +194,7 @@ public class SimpleNetworkStore
      */
     @Override
     public Set<Intent> removeIntents(String network) {
-        Set<Intent> Intents =intentsPerNet.get(network);
+        Set<Intent> Intents = (Set<Intent>) intentsPerNet.get(network);
         intentsPerNet.put(network,new HashSet<>());//is this necessary?
         return Intents;
     }
