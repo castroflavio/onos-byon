@@ -1,11 +1,16 @@
 package org.onos.byon;
 
-import com.google.common.collect.Maps;
+import com.google.common.collect.*;
+
 import org.apache.felix.scr.annotations.*;
+import org.onlab.packet.*;
 import org.onlab.util.KryoNamespace;
+import org.onosproject.core.DefaultApplicationId;
 import org.onosproject.net.HostId;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
+import org.onosproject.store.serializers.KryoNamespaces;
+import org.onosproject.store.serializers.MacAddressSerializer;
 import org.onosproject.store.service.ConsistentMap;
 import org.onosproject.store.service.Serializer;
 import org.onosproject.store.service.StorageService;
@@ -32,11 +37,21 @@ public class DistributedNetworkStore
     private ConsistentMap<String, Set<HostId>> networks;
     private ConsistentMap<String, Set<Intent>> intentsPerNet;
 
-    private static final Serializer SERIALIZER = new Serializer() {
+    private static final Serializer SERIALIZER = Serializer.using(KryoNamespaces.API);
+
+        /*private static final Serializer SERIALIZER = new Serializer() {
 
         KryoNamespace kryo = new KryoNamespace.Builder()
+
                 .register(HashSet.class)
-                .build();
+                .register(HostId.class)
+                .register(MacAddress.class)
+                .register(byte[].class)
+                .register(VlanId.class)
+                .register(HostToHostIntent.class)
+                .register(DefaultApplicationId.class)
+//                .register(com.google.common.collect.RegularImmutableList)
+                .build();*
 
         @Override
         public <T> byte[] encode(T object) {
@@ -48,7 +63,7 @@ public class DistributedNetworkStore
             return kryo.deserialize(bytes);
         }
 
-    };
+    };*/
     //private String listenerId;
     @Activate
     protected void activate() {
@@ -78,8 +93,8 @@ public class DistributedNetworkStore
      */
     @Override
     public void putNetwork(String network) {
-        networks.putIfAbsent(network,new HashSet<>());
-        intentsPerNet.putIfAbsent(network, new HashSet<>());
+        networks.putIfAbsent(network,Sets.newHashSet());
+        intentsPerNet.putIfAbsent(network, Sets.newHashSet());
     }
 
     /**
@@ -113,12 +128,12 @@ public class DistributedNetworkStore
      */
     @Override
     public Set<HostId> addHost(String network, HostId hostId) {
-        Set<HostId> hosts = (Set<HostId>) networks.get(network);
-        if (hosts==null) return new HashSet<>();//returns empty set if network doesn`t exist
+        Set<HostId> hosts = networks.get(network).value();
+        if (hosts==null) return Sets.newHashSet();//returns empty set if network doesn`t exist
         if (hosts.add(hostId)){
             networks.put(network,hosts);
             return hosts;
-        }else return new HashSet<>();
+        }else return Sets.newHashSet();
     }
 
     /**
@@ -129,7 +144,7 @@ public class DistributedNetworkStore
      */
     @Override
     public void removeHost(String network, HostId hostId) {
-        Set<HostId> hosts = (Set<HostId>) networks.get(network);
+        Set<HostId> hosts = networks.get(network).value();
         if (hosts!=null) hosts.remove(hostId);
     }
 
@@ -141,8 +156,8 @@ public class DistributedNetworkStore
      */
     @Override
     public Set<HostId> getHosts(String network) {
-        Set<HostId> hosts= (Set<HostId>) networks.get(network);
-        return (hosts!=null) ? hosts: new HashSet<>();
+        Set<HostId> hosts= networks.get(network).value();
+        return (hosts!=null) ? hosts: Sets.newHashSet();
     }
 
     /**
@@ -153,9 +168,9 @@ public class DistributedNetworkStore
      */
     @Override
     public void addIntents(String network, Set<Intent> intents) {
-        Set<Intent> Intents = (Set<Intent>) intentsPerNet.get(network);
+        Set<Intent> Intents = intentsPerNet.get(network).value();
         if (Intents==null) {
-            Intents = new HashSet<>();//is it going to break if null?
+            Intents = Sets.newHashSet();//is it going to break if null?
         }
         Intents.addAll(intents);
         intentsPerNet.put(network,Intents);//is this necessary
@@ -170,11 +185,11 @@ public class DistributedNetworkStore
      */
     @Override
     public Set<Intent> removeIntents(String network, HostId hostId) {
-        Set<Intent> Intents = (Set<Intent>) intentsPerNet.get(network);
+        Set<Intent> Intents = intentsPerNet.get(network).value();
         if (Intents==null) {
-            return new HashSet<>();
+            return Sets.newHashSet();
         }
-        Set<Intent> forRemoval = new HashSet<>();
+        Set<Intent> forRemoval = Sets.newHashSet();
         for (Intent item: Intents){
             HostToHostIntent intent = (HostToHostIntent) item;
             if (hostId.equals(intent.one()) || hostId.equals(intent.two())){
@@ -194,8 +209,8 @@ public class DistributedNetworkStore
      */
     @Override
     public Set<Intent> removeIntents(String network) {
-        Set<Intent> Intents = (Set<Intent>) intentsPerNet.get(network);
-        intentsPerNet.put(network,new HashSet<>());//is this necessary?
+        Set<Intent> Intents = intentsPerNet.get(network).value();
+        intentsPerNet.put(network,Sets.newHashSet());//is this necessary?
         return Intents;
     }
 }
